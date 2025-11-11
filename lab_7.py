@@ -96,7 +96,7 @@ class StateMachineNode(Node):
         - Update self.last_detection_time with the current timestamp
         """
         if msg.detections:
-            print("msg.data", msg.data)
+            # print("msg.data", msg.data)
             print("posx", msg.detections[0].bbox.center.position.x)
             # bbox=vision_msgs.msg.BoundingBox2D(center=vision_msgs.msg.Pose2D(position=vision_msgs.msg.Point2D(x=285.0068359375, y=299.092529296875)
             centers = [(detection.bbox.center.position.x / IMAGE_WIDTH - 0.5) for detection in msg.detections]
