@@ -66,6 +66,7 @@ class StateMachineNode(Node):
     def tracking_control_callback(self, msg):
         """Handle tracking control commands."""
         command = msg.data
+        print(msg.data)
         self.get_logger().info(f'📥 Received tracking control: "{command}"')
         
         if command.startswith("start:"):
@@ -96,8 +97,6 @@ class StateMachineNode(Node):
         - Update self.last_detection_time with the current timestamp
         """
         if msg.detections:
-            # print("msg.data", msg.data)
-            print("posx", msg.detections[0].bbox.center.position.x)
             # bbox=vision_msgs.msg.BoundingBox2D(center=vision_msgs.msg.Pose2D(position=vision_msgs.msg.Point2D(x=285.0068359375, y=299.092529296875)
             centers = [(detection.bbox.center.position.x / IMAGE_WIDTH - 0.5) for detection in msg.detections]
             if not self.target_pos:
@@ -105,7 +104,7 @@ class StateMachineNode(Node):
             else: 
                 self.last_detection_pos = self.target_pos
                 self.target_pos = np.argmax([np.linalg.norm(c-self.last_detection_pos) for c in centers])
-            self.last_detection_time = self.get_clock().now()
+            self.last_detection_time = self.get_clock().now().seconds()
 
 
     def timer_callback(self):
@@ -125,7 +124,7 @@ class StateMachineNode(Node):
         # - Convert the time difference from nanoseconds to seconds
         # - If time_since_detection > TIMEOUT, transition to State.SEARCH
         # - Otherwise, transition to State.TRACK
-        time_since_detection = (self.get_clock().now()-self.last_detection_time) / 1e-9  # TODO: Calculate time since last detection
+        time_since_detection = (self.get_clock().now().seconds() - self.last_detection_time)   # TODO: Calculate time since last detection
         
         if time_since_detection > TIMEOUT:  # TODO: Replace with condition checking
             self.state = State.SEARCH
