@@ -16,8 +16,8 @@ IMAGE_WIDTH = 700
 # TODO: Define constants for the state machine behavior
 TIMEOUT = 2  # TODO: Set the timeout threshold (in seconds) for determining when a detection is too old
 SEARCH_YAW_VEL = np.pi/4  # TODO: Set the angular velocity (rad/s) for rotating while searching for the target
-TRACK_FORWARD_VEL = 0.2  # TODO: Set the forward velocity (m/s) while tracking the target
-KP = 8.0  # TODO: Set the proportional gain for the proportional controller that centers the target
+TRACK_FORWARD_VEL = 0.7  # TODO: Set the forward velocity (m/s) while tracking the target
+KP = 6.0  # TODO: Set the proportional gain for the proportional controller that centers the target
 
 class State(Enum):
     IDLE = 0     # Stay in place, no tracking
@@ -52,8 +52,8 @@ class StateMachineNode(Node):
         self.timer = self.create_timer(0.1, self.timer_callback)
         
         # Start in IDLE mode (no tracking until commanded)
-        self.state = State.TRACK
-        self.tracking_enabled = True
+        self.state = State.IDLE
+        self.tracking_enabled = False
 
         # TODO: Initialize member variables to track detection state
         self.last_detection_pos = 0 # TODO: Store the last detection in the image so that we choose the closest detection in this frame
@@ -66,7 +66,6 @@ class StateMachineNode(Node):
     def tracking_control_callback(self, msg):
         """Handle tracking control commands."""
         command = msg.data
-        print(msg.data)
         self.get_logger().info(f'📥 Received tracking control: "{command}"')
         
         if command.startswith("start:"):
@@ -124,9 +123,9 @@ class StateMachineNode(Node):
         # - If time_since_detection > TIMEOUT, transition to State.SEARCH
         # - Otherwise, transition to State.TRACK
         time_since_detection = (self.get_clock().now() - self.last_detection_time).nanoseconds * 1e-9   # TODO: Calculate time since last detection
-        print("timeee ", time_since_detection)
-        print("timeee now ", self.get_clock().now().nanoseconds)
-        print("last_detection_time) ", self.last_detection_time.nanoseconds)
+        # print("timeee ", time_since_detection)
+        # print("timeee now ", self.get_clock().now().nanoseconds)
+        # print("last_detection_time) ", self.last_detection_time.nanoseconds)
         if time_since_detection > TIMEOUT:  # TODO: Replace with condition checking
             self.state = State.SEARCH
         else:
@@ -156,8 +155,8 @@ class StateMachineNode(Node):
             # - Set forward_vel_command to TRACK_FORWARD_VEL to move toward the target
             yaw_command = -self.target_pos * KP  
             forward_vel_command = TRACK_FORWARD_VEL # TODO: Implement TRACK state behavior
-        print("YAWWW", yaw_command)
-        print("FORWARD", forward_vel_command)
+        # print("YAWWW", yaw_command)
+        # print("FORWARD", forward_vel_command)
 
         cmd = Twist()
         cmd.angular.z = yaw_command
