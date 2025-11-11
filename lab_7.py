@@ -17,7 +17,7 @@ IMAGE_WIDTH = 700
 TIMEOUT = 10  # TODO: Set the timeout threshold (in seconds) for determining when a detection is too old
 SEARCH_YAW_VEL = np.pi/4  # TODO: Set the angular velocity (rad/s) for rotating while searching for the target
 TRACK_FORWARD_VEL = 0.2  # TODO: Set the forward velocity (m/s) while tracking the target
-KP = 0.8  # TODO: Set the proportional gain for the proportional controller that centers the target
+KP = 8  # TODO: Set the proportional gain for the proportional controller that centers the target
 
 class State(Enum):
     IDLE = 0     # Stay in place, no tracking
@@ -52,8 +52,8 @@ class StateMachineNode(Node):
         self.timer = self.create_timer(0.1, self.timer_callback)
         
         # Start in IDLE mode (no tracking until commanded)
-        self.state = State.TRACK
-        self.tracking_enabled = True
+        self.state = State.IDLE
+        self.tracking_enabled = False
 
         # TODO: Initialize member variables to track detection state
         self.last_detection_pos = 0 # TODO: Store the last detection in the image so that we choose the closest detection in this frame
@@ -126,7 +126,7 @@ class StateMachineNode(Node):
         # - Convert the time difference from nanoseconds to seconds
         # - If time_since_detection > TIMEOUT, transition to State.SEARCH
         # - Otherwise, transition to State.TRACK
-        time_since_detection = (self.get_clock().now() - self.last_detection_time).nanoseconds / 1e-9   # TODO: Calculate time since last detection
+        time_since_detection = (self.get_clock().now() - self.last_detection_time).nanoseconds * 1e-9   # TODO: Calculate time since last detection
         print("timeee ", time_since_detection)
         print("timeee now ", self.get_clock().now().nanoseconds)
         print("last_detection_time) ", self.last_detection_time.nanoseconds)
