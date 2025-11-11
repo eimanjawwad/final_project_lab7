@@ -19,13 +19,9 @@ class KarelPupper:
         self.node = Node('karel_node')
         self.publisher = self.node.create_publisher(Twist, 'cmd_vel', 10)
         
-        # NEW FOR LAB 7: Tracking control publisher
-        # This publisher sends tracking commands to the state machine node
         self.tracking_control_publisher = self.node.create_publisher(
             String, '/tracking_control', 10
         )
-        
-        # NEW FOR LAB 7: Track current tracking state
         self.tracking_enabled = False
         self.tracking_object = None
 
@@ -242,21 +238,3 @@ class KarelPupper:
         self.node.get_logger().info('Tearing down...')
         self.node.destroy_node()
         rclpy.shutdown()
-
-
-
-
-
-    
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
