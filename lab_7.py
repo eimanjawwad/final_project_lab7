@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(__file__))
 IMAGE_WIDTH = 700
 
 # TODO: Define constants for the state machine behavior
-TIMEOUT = 10  # TODO: Set the timeout threshold (in seconds) for determining when a detection is too old
+TIMEOUT = 2  # TODO: Set the timeout threshold (in seconds) for determining when a detection is too old
 SEARCH_YAW_VEL = np.pi/4  # TODO: Set the angular velocity (rad/s) for rotating while searching for the target
 TRACK_FORWARD_VEL = 0.2  # TODO: Set the forward velocity (m/s) while tracking the target
 KP = 8  # TODO: Set the proportional gain for the proportional controller that centers the target
@@ -146,7 +146,7 @@ class StateMachineNode(Node):
             # - Set yaw_command to rotate in the direction where the target was last seen
             # - Use SEARCH_YAW_VEL and rotate opposite to the sign of self.target_pos
             # - Keep forward_vel_command = 0.0 (don't move forward while searching)
-            yaw_command = SEARCH_YAW_VEL if self.target_pos >=0 else -SEARCH_YAW_VEL # TODO: Implement SEARCH state behavior
+            yaw_command = -SEARCH_YAW_VEL if self.last_detection_pos >=0 else SEARCH_YAW_VEL # TODO: Implement SEARCH state behavior
             
         elif self.state == State.TRACK:
             # TODO: Implement tracking behavior using proportional control
@@ -155,6 +155,8 @@ class StateMachineNode(Node):
             # - Set forward_vel_command to TRACK_FORWARD_VEL to move toward the target
             yaw_command = -self.target_pos * KP  
             forward_vel_command = TRACK_FORWARD_VEL # TODO: Implement TRACK state behavior
+        print("YAWWW", yaw_command)
+        print("FORWARD", forward_vel_command)
 
         cmd = Twist()
         cmd.angular.z = yaw_command
