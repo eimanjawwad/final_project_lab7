@@ -28,6 +28,7 @@ class KarelPupper:
     def begin_tracking(self, obj: str = "person"):
         self.tracking_enabled = True
         self.tracking_object = obj
+        msg = String()
         msg.data = f"start:{obj}"
         self.tracking_control_publisher.publish(msg)
         rclpy.spin_once(self.node, timeout_sec=0.1)
@@ -36,6 +37,7 @@ class KarelPupper:
     def end_tracking(self):
         self.tracking_enabled = False
         self.tracking_object = None
+        msg = String()
         msg.data = "stop" 
         self.tracking_control_publisher.publish(msg)
         relpy.spin_once(self.node, timeout_sec=0.1)
