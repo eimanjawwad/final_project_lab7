@@ -52,8 +52,8 @@ class StateMachineNode(Node):
         self.timer = self.create_timer(0.1, self.timer_callback)
         
         # Start in IDLE mode (no tracking until commanded)
-        self.state = State.IDLE
-        self.tracking_enabled = False
+        self.state = State.TRACK
+        self.tracking_enabled = True
 
         # TODO: Initialize member variables to track detection state
         self.last_detection_pos = 0 # TODO: Store the last detection in the image so that we choose the closest detection in this frame
