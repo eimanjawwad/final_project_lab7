@@ -57,7 +57,7 @@ class StateMachineNode(Node):
 
         # TODO: Initialize member variables to track detection state
         self.last_detection_pos = 0 # TODO: Store the last detection in the image so that we choose the closest detection in this frame
-        self.target_pos = None  # TODO: Store the target's normalized position in the image (range: -0.5 to 0.5, where 0 is center)
+        self.target_pos = 0  # TODO: Store the target's normalized position in the image (range: -0.5 to 0.5, where 0 is center)
         self.last_detection_time = self.get_clock().now()  # TODO: Store the timestamp of the most recent detection for timeout checking
         
         self.get_logger().info('State Machine Node initialized in IDLE state.')
@@ -100,11 +100,8 @@ class StateMachineNode(Node):
             # bbox=vision_msgs.msg.BoundingBox2D(center=vision_msgs.msg.Pose2D(position=vision_msgs.msg.Point2D(x=285.0068359375, y=299.092529296875)
             centers = [(detection.bbox.center.position.x / IMAGE_WIDTH - 0.5) for detection in msg.detections]
             print("centers: ", centers)
-            if not self.target_pos:
-                self.target_pos = np.argmin([abs(c) for c in centers])
-            else: 
-                self.last_detection_pos = self.target_pos
-                self.target_pos = np.argmin([np.linalg.norm(c-self.last_detection_pos) for c in centers])
+            self.last_detection_pos = self.target_pos
+            self.target_pos = np.argmin([np.linalg.norm(c-self.last_detection_pos) for c in centers])
             print("target pos: ", self.target_pos)
             self.last_detection_time = self.get_clock().now()
 
