@@ -172,10 +172,8 @@ class RealtimeVoiceNode(Node):
         """
         try:
             base64_str = base64.b64encode(msg.data).decode('utf-8')
-
             self.latest_camera_image_base64 = base64_str
             self.camera_image_pending = True
-
             logger.debug("Camera snapshot processed and marked as pending.")
         except Exception as e:
             logger.error(f"Error processing camera snapshot: {e}")
