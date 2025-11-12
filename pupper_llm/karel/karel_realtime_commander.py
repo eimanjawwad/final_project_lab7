@@ -136,20 +136,18 @@ class KarelRealtimeCommanderNode(Node):
                     "backward", "back", "reverse", 
                     "bob", "wiggle", "dance", "bark", "stop",  "wag",
                     "stop tracking", "stop following"]
-        determiners = ["this", "that","the", "a", "these", "those"]
-        for d in determiners:
-            line.replace(d, "")
-        follow_commands = ["follow", "track"] # applies to [following, tracking] 
         order = {}
 
         for c in commands:
             if c in line:
                 order[line.find(c)] = c.replace(" ", "_")
         if not ("stop_tracking" in order or "stop_following" in order):
+            follow_commands = ["follow", "track"] # applies to [following, tracking] 
             for c in follow_commands: 
-                if c in line:
+                if c in line: 
+                    line.replace("the", "") # "start tracking person"
                     idx = line.find(c)
-                    order[idx] = str(line[idx:].split()[0:3]).replace(" ", "_")  # grab command + subject
+                    order[idx] = "track_" + str(line[idx:].split()[1])  # command + subject
         return list(order.values())
     
     async def execute_command(self, command: str) -> bool:
@@ -209,11 +207,16 @@ class KarelRealtimeCommanderNode(Node):
                 # Bark plays audio, give it time to complete
                 self.pupper.bark()
                 await asyncio.sleep(2.0)
-            elif command in ["stop tracking"]:
+            elif command.startswith("track"):
+                obj = command.split("_", 1)[1]
+                logger.info(f'Queueing command: start tracking {obj}')
+                self.pupper.begin_tracking(obj)
+                await asyncio.sleep(0.5)
+            elif command in ["stop_tracking", "stop_following"]:
                 logger.info('Queueing command: end tracking')
                 # Bark plays audio, give it time to complete
                 self.pupper.end_tracking()
-                await asyncio.sleep(2.0)
+                await asyncio.sleep(0.5)
             else:
                 logger.warning(f"⚠️  Unknown command: {command}")
                 return False
