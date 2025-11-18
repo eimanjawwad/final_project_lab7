@@ -162,7 +162,7 @@ class KarelRealtimeCommanderNode(Node):
             #   Use: object_name = command.split("_", 1)[1]
             # - If command is "stop_tracking", call self.pupper.end_tracking()
             # - Use await asyncio.sleep(0.5) after each tracking command
-            breakpoint()
+            print(f"Command = {command}", flush=True)
             # TODO: Paste your Lab 6 command mapping implementation below
             # Implement the mapping from canonical command names (e.g., "move", "turn_left", "bark", etc.) to the appropriate KarelPupper action and its timing.
             # One complete mapping is shown as an example!
