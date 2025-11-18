@@ -212,7 +212,7 @@ class KarelRealtimeCommanderNode(Node):
                 logger.info(f'Queueing command: start tracking {obj}')
                 self.pupper.begin_tracking(obj)
                 await asyncio.sleep(0.5)
-            elif command in ["stop_tracking", "stop_following"]:
+            elif command == "stop":
                 logger.info('Queueing command: end tracking')
                 # Bark plays audio, give it time to complete
                 self.pupper.end_tracking()
