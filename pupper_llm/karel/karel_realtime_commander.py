@@ -141,7 +141,7 @@ class KarelRealtimeCommanderNode(Node):
         for c in commands:
             if c in line:
                 order[line.find(c)] = c.replace(" ", "_")
-        if not "stop" in commands:
+        if not "stop" in line:
             follow_commands = ["follow", "track"] # applies to [following, tracking] 
             for c in follow_commands: 
                 if c in line: 
