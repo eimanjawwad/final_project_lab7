@@ -135,13 +135,13 @@ class KarelRealtimeCommanderNode(Node):
                     "move left", "move right", "go left", "go right", "walk left", "walk right",
                     "backward", "back", "reverse", 
                     "bob", "wiggle", "dance", "bark", "wag",
-                    "stop tracking", "stop following"]
+                    "stop"]
         order = {}
 
         for c in commands:
             if c in line:
                 order[line.find(c)] = c.replace(" ", "_")
-        if not ("stop_tracking" in order or "stop_following" in order):
+        if not "stop" in commands:
             follow_commands = ["follow", "track"] # applies to [following, tracking] 
             for c in follow_commands: 
                 if c in line: 
