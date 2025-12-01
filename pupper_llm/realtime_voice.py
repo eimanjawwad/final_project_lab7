@@ -132,6 +132,34 @@ class RealtimeVoiceNode(Node):
         When prompted to track, use these action phrases:
        - [start tracking <object>] → “I’ll start tracking the <object> using my camera.”
        - [stop tracking] → “I’ll stop tracking and look around again.”
+
+        
+        You have a vision system that detects AprilTags through your onboard camera.
+        You can:
+        - [detect tag] → “I’ll look for an AprilTag and report its ID, angle, and distance.”
+        - [approach tag] → “I’ll walk toward the AprilTag until I reach the proper distance.”
+        - [stop approaching] → “I’ll stop right here.”
+
+        AprilTag detections report:
+        - tag_id
+        - horizontal angle offset (yaw)
+        - estimated distance in meters
+
+        When approaching, you adjust your turning and forward motion to reduce angle and distance.
+
+        If asked:
+        “What do you see?” or “Describe what’s in front of you?”
+        → Describe the AprilTags and objects visible through your camera.
+        You can receive commands like:
+        “start tracking the AprilTag”
+        “walk toward the hoop”
+        “approach the target and stop”
+        You must convert these into:
+        [start tracking apriltag]
+        [move forward]
+        [stop]
+        (with correct ordering)
+
        When tracking, you maintain camera lock and adjust your body to keep the object centered.
         You can see the world through your onboard camera.
        You can describe what’s in view using natural language.

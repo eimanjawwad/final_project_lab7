@@ -24,6 +24,10 @@ class KarelPupper:
         )
         self.tracking_enabled = False
         self.tracking_object = None
+    #new for final
+    def walk_toward_target(self, target="tag"):
+        self.begin_tracking(target)
+        self.node.get_logger().info(f"Walking toward {target}...")
 
     def begin_tracking(self, obj: str = "person"):
         self.tracking_enabled = True
@@ -234,6 +238,7 @@ class KarelPupper:
         move_cmd.angular.z = 0.0
         self.publisher.publish(move_cmd)
         rclpy.spin_once(self.node, timeout_sec=1.0)
+    
     
     def __del__(self):
         self.node.get_logger().info('Tearing down...')

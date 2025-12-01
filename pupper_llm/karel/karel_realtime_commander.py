@@ -137,7 +137,10 @@ class KarelRealtimeCommanderNode(Node):
                     "bob", "wiggle", "dance", "bark", "wag",
                     "stop"]
         order = {}
-
+        # new for final
+        if "walk to" in line and "target" in line:
+            return ["walk_to_target"]
+        #   
         for c in commands:
             if c in line:
                 order[line.find(c)] = c.replace(" ", "_")
@@ -217,6 +220,12 @@ class KarelRealtimeCommanderNode(Node):
                 # Bark plays audio, give it time to complete
                 self.pupper.end_tracking()
                 await asyncio.sleep(0.5)
+            # new for final
+            elif command == "walk_to_target":
+                logger.info("Walking toward tracked target…")
+                self.pupper.walk_toward_target() 
+                await asyncio.sleep(0.1)
+            #    
             else:
                 logger.warning(f"⚠️  Unknown command: {command}")
                 return False
