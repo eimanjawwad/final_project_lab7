@@ -223,7 +223,7 @@ class KarelRealtimeCommanderNode(Node):
             # new for final
             elif command == "walk_to_target":
                 logger.info("Walking toward tracked target…")
-                self.pupper.walk_toward_target() 
+                self.pupper.walk_toward_target("cat") 
                 await asyncio.sleep(0.1)
             #    
             else:

@@ -12,6 +12,7 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 IMAGE_WIDTH = 700
+STOPPING_WIDTH = 0.4 * IMAGE_WIDTH
 
 # TODO: Define constants for the state machine behavior
 TIMEOUT = 2  # TODO: Set the timeout threshold (in seconds) for determining when a detection is too old
@@ -103,6 +104,16 @@ class StateMachineNode(Node):
             self.target_pos = centers[np.argmin([np.abs(c-self.last_detection_pos) for c in centers])]
             #print("target pos: ", self.target_pos)
             self.last_detection_time = self.get_clock().now()
+
+            # new for final
+            print(msg.detections[0].bbox)
+            if (msg.detections[0].bbox.width >= STOPPING_WIDTH):
+                self.tracking_enabled = False
+                self.get_logger().info('⏸️  Tracking disabled - returning to IDLE')
+                self.get_logger().info(f'   State transition: {self.state.name} → IDLE')
+                self.state = State.IDLE
+                cmd = Twist()
+                self.command_publisher.publish(cmd)
 
 
     def timer_callback(self):
