@@ -98,8 +98,8 @@ class InteractiveTrackingTester:
                 return
             
             print(f"\n🎯 Starting tracking: {object_name}")
-            # self.pupper.begin_tracking(object_name)
-            self.pupper.walk_toward_target("stop sign")
+            self.pupper.begin_tracking(object_name)
+            # self.pupper.walk_toward_target("stop sign")
             # Spin once to ensure message is published
             rclpy.spin_once(self.pupper.node, timeout_sec=0.1)
             
