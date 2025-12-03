@@ -12,6 +12,7 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 IMAGE_WIDTH = 700
+STOP_WIDTH = 300  # width at which pupper should stop
 
 # TODO: Define constants for the state machine behavior
 TIMEOUT = 2  # TODO: Set the timeout threshold (in seconds) for determining when a detection is too old
@@ -153,7 +154,7 @@ class StateMachineNode(Node):
             # - Set yaw_command using a proportional controller: -self.target_pos * KP
             # - This will turn the robot to center the target in the camera view
             # - Set forward_vel_command to TRACK_FORWARD_VEL to move toward the target
-            if self.target_width < IMAGE_WIDTH:
+            if self.target_width < STOP_WIDTH:
                 forward_vel_command = TRACK_FORWARD_VEL
                 yaw_command = -self.target_pos * KP
                 #dist_scale = np.clip((STOP_WIDTH - self.target_width) / STOP_WIDTH, 0.0, 1.0)
@@ -161,6 +162,7 @@ class StateMachineNode(Node):
             else:
                 forward_vel_command = 0.0
                 yaw_command = 0.0
+                self.tracking_enabled = False
 
             # yaw_command = -self.target_pos * KP  
             # forward_vel_command = TRACK_FORWARD_VEL # TODO: Implement TRACK state behavior
