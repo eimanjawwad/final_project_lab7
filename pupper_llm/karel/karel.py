@@ -25,7 +25,7 @@ class KarelPupper:
         self.tracking_enabled = False
         self.tracking_object = None
     #new for final
-    def walk_toward_target(self, target="cat"):
+    def walk_toward_target(self, target="stop sign"):
         self.begin_tracking(target)
         self.node.get_logger().info(f"Walking toward {target}...")
 
