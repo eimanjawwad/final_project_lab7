@@ -12,12 +12,12 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 IMAGE_WIDTH = 700
-STOP_WIDTH = 300  # width at which pupper should stop
+STOP_WIDTH = 100  # width at which pupper should stop
 
 # TODO: Define constants for the state machine behavior
 TIMEOUT = 2  # TODO: Set the timeout threshold (in seconds) for determining when a detection is too old
 SEARCH_YAW_VEL = np.pi/4  # TODO: Set the angular velocity (rad/s) for rotating while searching for the target
-TRACK_FORWARD_VEL = 0.7  # TODO: Set the forward velocity (m/s) while tracking the target
+TRACK_FORWARD_VEL = 0.3  # TODO: Set the forward velocity (m/s) while tracking the target
 KP = 6.0  # TODO: Set the proportional gain for the proportional controller that centers the target
 
 class State(Enum):
@@ -107,7 +107,6 @@ class StateMachineNode(Node):
             #print("target pos: ", self.target_pos)
             self.last_detection_time = self.get_clock().now()
             self.target_width = msg.detections[idx].bbox.size_x
-
 
     def timer_callback(self):
         """
