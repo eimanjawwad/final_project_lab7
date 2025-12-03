@@ -17,7 +17,8 @@ class KarelPupper:
         if not rclpy.ok():
             rclpy.init()
         self.node = Node('karel_node')
-        self.publisher = self.node.create_publisher(Twist, 'cmd_vel', 10)
+        self.publisher = self.node.create_publisher(Twist, 'cmd_vel', 10)        
+        # self.joint_state_publisher = self.node.create_publisher(JointState, 'joint_states', 10)       
         
         self.tracking_control_publisher = self.node.create_publisher(
             String, '/tracking_control', 10
