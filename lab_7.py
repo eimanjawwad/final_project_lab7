@@ -12,7 +12,7 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 IMAGE_WIDTH = 700
-STOP_WIDTH = 100  # width at which pupper should stop
+STOP_WIDTH = 60  # width at which pupper should stop
 
 # TODO: Define constants for the state machine behavior
 TIMEOUT = 2  # TODO: Set the timeout threshold (in seconds) for determining when a detection is too old
