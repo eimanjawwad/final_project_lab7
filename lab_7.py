@@ -59,6 +59,7 @@ class StateMachineNode(Node):
         self.last_detection_pos = 0 # TODO: Store the last detection in the image so that we choose the closest detection in this frame
         self.target_pos = 0  # TODO: Store the target's normalized position in the image (range: -0.5 to 0.5, where 0 is center)
         self.last_detection_time = self.get_clock().now()  # TODO: Store the timestamp of the most recent detection for timeout checking
+        self.target_width = 0  # width
         
         self.get_logger().info('State Machine Node initialized in IDLE state.')
         self.get_logger().info('Use begin_tracking(object) to enable tracking.')
@@ -100,9 +101,11 @@ class StateMachineNode(Node):
             centers = [(detection.bbox.center.position.x / IMAGE_WIDTH - 0.5) for detection in msg.detections]
             #print("centers: ", centers)
             self.last_detection_pos = self.target_pos
-            self.target_pos = centers[np.argmin([np.abs(c-self.last_detection_pos) for c in centers])]
+            idx = np.argmin([np.abs(c-self.last_detection_pos) for c in centers])
+            self.target_pos = centers[idx]
             #print("target pos: ", self.target_pos)
             self.last_detection_time = self.get_clock().now()
+            self.target_width = msg.detections[idx].bbox.size_x
 
 
     def timer_callback(self):
@@ -123,9 +126,6 @@ class StateMachineNode(Node):
         # - If time_since_detection > TIMEOUT, transition to State.SEARCH
         # - Otherwise, transition to State.TRACK
         time_since_detection = (self.get_clock().now() - self.last_detection_time).nanoseconds * 1e-9   # TODO: Calculate time since last detection
-        # print("timeee ", time_since_detection)
-        # print("timeee now ", self.get_clock().now().nanoseconds)
-        # print("last_detection_time) ", self.last_detection_time.nanoseconds)
         if time_since_detection > TIMEOUT:  # TODO: Replace with condition checking
             self.state = State.SEARCH
         else:
@@ -153,10 +153,17 @@ class StateMachineNode(Node):
             # - Set yaw_command using a proportional controller: -self.target_pos * KP
             # - This will turn the robot to center the target in the camera view
             # - Set forward_vel_command to TRACK_FORWARD_VEL to move toward the target
-            yaw_command = -self.target_pos * KP  
-            forward_vel_command = TRACK_FORWARD_VEL # TODO: Implement TRACK state behavior
-        # print("YAWWW", yaw_command)
-        # print("FORWARD", forward_vel_command)
+            if self.target_width < IMAGE_WIDTH:
+                forward_vel_command = TRACK_FORWARD_VEL
+                yaw_command = -self.target_pos * KP
+                #dist_scale = np.clip((STOP_WIDTH - self.target_width) / STOP_WIDTH, 0.0, 1.0)
+                #forward_vel_command = TRACK_FORWARD_VEL * dist_scale
+            else:
+                forward_vel_command = 0.0
+                yaw_command = 0.0
+
+            # yaw_command = -self.target_pos * KP  
+            # forward_vel_command = TRACK_FORWARD_VEL # TODO: Implement TRACK state behavior
 
         cmd = Twist()
         cmd.angular.z = yaw_command
