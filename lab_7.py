@@ -71,13 +71,15 @@ FULL_BEND = np.array([
     -0.6676559066772461,
 ])
 IMAGE_WIDTH = 700
+IMAGE_HEIGHT = 525
 STOP_WIDTH = 60  # width at which pupper should stop
+AIM_PRECISION = 0.05  # precision for vertical centering during bending
 
 # TODO: Define constants for the state machine behavior
 TIMEOUT = 2  # TODO: Set the timeout threshold (in seconds) for determining when a detection is too old
 SEARCH_YAW_VEL = np.pi/4  # TODO: Set the angular velocity (rad/s) for rotating while searching for the target
-TRACK_FORWARD_VEL = 0.3  # TODO: Set the forward velocity (m/s) while tracking the target
-KP = 6.0  # TODO: Set the proportional gain for the proportional controller that centers the target
+TRACK_FORWARD_VEL = 0.2  # TODO: Set the forward velocity (m/s) while tracking the target
+KP = 5.0  # TODO: Set the proportional gain for the proportional controller that centers the target
 
 class State(Enum):
     IDLE = 0     # Stay in place, no tracking
@@ -126,6 +128,7 @@ class StateMachineNode(Node):
         self.target_pos = 0  # TODO: Store the target's normalized position in the image (range: -0.5 to 0.5, where 0 is center)
         self.last_detection_time = self.get_clock().now()  # TODO: Store the timestamp of the most recent detection for timeout checking
         self.target_width = 0  # width
+        self.target_pos_y = 0  # vertical position for bending
         
         self.get_logger().info('State Machine Node initialized in IDLE state.')
         self.get_logger().info('Use begin_tracking(object) to enable tracking.')
@@ -207,27 +210,24 @@ class StateMachineNode(Node):
             self.command_publisher.publish(cmd)
 
     def detection_callback(self, msg):
-        """
-        Process incoming detections to identify and track the most central object.
-        
-        TODO: Implement detection processing
-        - Check if any detections exist in msg.detections
-        - Calculate the normalized center position for each detection (x-coordinate / IMAGE_WIDTH - 0.5)
-        - Initially, find the detection closest to the image center (smallest absolute normalized position)
-        - After initial detection, find the detection closest to the last detection so that Pupper tracks the same person
-        - Store the normalized position in self.target_pos
-        - Update self.last_detection_time with the current timestamp
-        """
+        # Process incoming detections to identify and track the most central object.
+
         if len(msg.detections) > 0:
             # bbox=vision_msgs.msg.BoundingBox2D(center=vision_msgs.msg.Pose2D(position=vision_msgs.msg.Point2D(x=285.0068359375, y=299.092529296875)
+            # For centering on target
             centers = [(detection.bbox.center.position.x / IMAGE_WIDTH - 0.5) for detection in msg.detections]
-            #print("centers: ", centers)
             self.last_detection_pos = self.target_pos
-            idx = np.argmin([np.abs(c-self.last_detection_pos) for c in centers])
-            self.target_pos = centers[idx]
-            #print("target pos: ", self.target_pos)
+            idx = np.argmin([np.abs(c-self.last_detection_pos) for c in centers]) # Closest to last detection
+            self.target_pos = centers[idx] 
             self.last_detection_time = self.get_clock().now()
-            self.target_width = msg.detections[idx].bbox.size_x
+
+            # For vertical centering during bending
+            if self.state == State.BEND:
+                centers_y = [(detection.bbox.center.position.y / IMAGE_HEIGHT - 0.5) for detection in msg.detections]
+                self.target_pos_y = centers_y[idx]
+
+            # For distance control
+            self.target_width = msg.detections[idx].bbox.size_x 
 
     def timer_callback(self):
         """
@@ -236,22 +236,14 @@ class StateMachineNode(Node):
         """
         # State machine logic
         if not self.tracking_enabled:
-            self.switch_to_position_controller()
-            self.state = "halfway"
-            self.current_pos = STANDING
-            self.trajectory = self.smooth_move(FULL_BEND, duration=6.0)
-
-            self.tracking_enabled = True
             # Not tracking - stay idle and DON'T publish
             # This allows Karel commands to control the robot
             self.state = State.IDLE
             return
-        pos = next(self.trajectory)
-        self.publish(pos)
-        return
         
-        time_since_detection = (self.get_clock().now() - self.last_detection_time).nanoseconds * 1e-9   # TODO: Calculate time since last detection
-        if time_since_detection > TIMEOUT:  # TODO: Replace with condition checking
+        # State transition based on detection timeout
+        time_since_detection = (self.get_clock().now() - self.last_detection_time).nanoseconds * 1e-9   
+        if time_since_detection > TIMEOUT:  
             self.state = State.SEARCH
         else:
             self.state = State.TRACK
@@ -267,20 +259,34 @@ class StateMachineNode(Node):
         
         elif self.state == State.SEARCH:
             forward_vel_command = 0.0
-            yaw_command = -SEARCH_YAW_VEL if self.last_detection_pos >=0 else SEARCH_YAW_VEL # TODO: Implement SEARCH state behavior
+            yaw_command = -SEARCH_YAW_VEL if self.last_detection_pos >=0 else SEARCH_YAW_VEL 
             
         elif self.state == State.TRACK:
+            # Stops a distance from the target
             if self.target_width < STOP_WIDTH:
-                forward_vel_command = TRACK_FORWARD_VEL
                 yaw_command = -self.target_pos * KP
-                #dist_scale = np.clip((STOP_WIDTH - self.target_width) / STOP_WIDTH, 0.0, 1.0)
-                #forward_vel_command = TRACK_FORWARD_VEL * dist_scale
-            else:
-                forward_vel_command = 0.0
-                yaw_command = 0.0
-                # self.tracking_enabled = False
-                self.publish_joint_positions()
-                return
+
+                # Slows down as it gets closer
+                dist_scale = np.clip((STOP_WIDTH - self.target_width) / STOP_WIDTH, 0.0, 1.0)
+                forward_vel_command = TRACK_FORWARD_VEL * dist_scale
+            else: 
+                # Center to target horizontally 
+                if abs(self.target_pos_y - 0.5) <= AIM_PRECISION:
+                    # Transition to BEND state and switch to Forward Controller
+                    self.state = State.BEND                            
+                    self.switch_to_position_controller()
+                    self.trajectory = self.smooth_move(FULL_BEND, duration=6.0)
+                else: 
+                    # Rotate to center horizontally
+                    yaw_command = -self.target_pos * KP
+
+        elif self.state == State.BEND:   
+            if abs(self.target_pos_y - 0.5) <= AIM_PRECISION:
+                # TODO Stop Bending and Shoot   
+                self.state = State.IDLE      
+            else: 
+                pos = next(self.trajectory)
+                self.publish(pos)
 
         cmd = Twist()
         cmd.angular.z = yaw_command
@@ -296,7 +302,7 @@ def main():
     except KeyboardInterrupt:
         print("Program terminated by user")
     finally:
-        zero_cmd = Twist()
+        # zero_cmd = Twist()
         # state_machine_node.command_publisher.publish(zero_cmd)
 
         state_machine_node.destroy_node()
