@@ -221,13 +221,13 @@ class StateMachineNode(Node):
             self.target_pos = centers[idx] 
             self.last_detection_time = self.get_clock().now()
 
+            # For distance control
+            self.target_width = msg.detections[idx].bbox.size_x 
+
             # For vertical centering during bending
             if self.state == State.BEND:
                 centers_y = [(detection.bbox.center.position.y / IMAGE_HEIGHT - 0.5) for detection in msg.detections]
                 self.target_pos_y = centers_y[idx]
-
-            # For distance control
-            self.target_width = msg.detections[idx].bbox.size_x 
 
     def timer_callback(self):
         """
@@ -253,12 +253,10 @@ class StateMachineNode(Node):
         forward_vel_command = 0.0
 
         if self.state == State.IDLE:
-            # Stay still
             yaw_command = 0.0
             forward_vel_command = 0.0
         
         elif self.state == State.SEARCH:
-            forward_vel_command = 0.0
             yaw_command = -SEARCH_YAW_VEL if self.last_detection_pos >=0 else SEARCH_YAW_VEL 
             
         elif self.state == State.TRACK:
@@ -271,22 +269,23 @@ class StateMachineNode(Node):
                 forward_vel_command = TRACK_FORWARD_VEL * dist_scale
             else: 
                 # Center to target horizontally 
-                if abs(self.target_pos_y - 0.5) <= AIM_PRECISION:
+                if abs(self.target_pos_y) <= AIM_PRECISION:
                     # Transition to BEND state and switch to Forward Controller
                     self.state = State.BEND                            
                     self.switch_to_position_controller()
                     self.trajectory = self.smooth_move(FULL_BEND, duration=6.0)
                 else: 
-                    # Rotate to center horizontally
+                    # Rotate to center on target horizontally
                     yaw_command = -self.target_pos * KP
 
         elif self.state == State.BEND:   
-            if abs(self.target_pos_y - 0.5) <= AIM_PRECISION:
+            if abs(self.target_pos_y) <= AIM_PRECISION:
                 # TODO Stop Bending and Shoot   
                 self.state = State.IDLE      
             else: 
                 pos = next(self.trajectory)
                 self.publish(pos)
+            return # Skips Neural Controller command publishing
 
         cmd = Twist()
         cmd.angular.z = yaw_command
