@@ -1,16 +1,75 @@
 from enum import Enum
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, Pose
+from sensor_msgs.msg import JointState
 from vision_msgs.msg import Detection2DArray
-from std_msgs.msg import String
+from std_msgs.msg import String, Float64MultiArray
+from controller_manager_msgs.srv import SwitchController
 import numpy as np
 import sys
 import os
+import subprocess
 
 # Add pupper_llm to path
 sys.path.append(os.path.dirname(__file__))
 
+JOINT_NAMES = [
+    "leg_front_r_2",
+    "leg_front_l_1",
+    "leg_front_l_2",
+    "leg_front_r_1",
+    "leg_front_l_3",
+    "leg_front_r_3",
+    "leg_back_r_1",
+    "leg_back_r_3",
+    "leg_back_l_1",
+    "leg_back_r_2",
+    "leg_back_l_2",
+    "leg_back_l_3",
+]
+STANDING = np.array([
+    -0.02936927795410149,
+    -0.954029350280762,
+    -0.07515533447265627,
+    0.9048188018798828,
+    1.1725817108154297,
+    -1.0447874450683594,
+    0.6961520004272461,
+    -1.0295286560058594,
+    -0.6190941619873047,
+    -0.00953189849853514,
+    0.024027748107910085,
+    1.1248970413208008
+])
+HALF_BEND = np.array([
+    -0.05263893127441405,
+    -0.2757656860351563,
+    0.04577247619628905,
+    0.4771845626831055,
+    0.940263786315918,
+    -1.0966682815551758,
+    -0.08396503448486325,
+    -0.23758510589599613,
+    0.057643623352050755,
+    0.046545104980468766,
+    -0.09575565338134767,
+    0.20783046722412113,
+])
+FULL_BEND = np.array([
+    -0.05950538635253905,
+    -0.6705935287475586,
+    0.14266674041748045,
+    0.3383276748657227,
+    1.9275226974487305,
+    -1.279013671875,
+    -0.7488772583007812,
+    0.6981744384765625,
+    0.7343814086914062,
+    0.01602657318115236,
+    0.03051273345947264,
+    -0.6676559066772461,
+])
 IMAGE_WIDTH = 700
 STOP_WIDTH = 60  # width at which pupper should stop
 
@@ -24,6 +83,7 @@ class State(Enum):
     IDLE = 0     # Stay in place, no tracking
     SEARCH = 1   # Rotate to search for target
     TRACK = 2    # Follow the target
+    BEND = 3    # Bend towards the target
 
 class StateMachineNode(Node):
     def __init__(self):
@@ -42,6 +102,11 @@ class StateMachineNode(Node):
             10
         )
         
+        self.position_publisher = self.create_publisher(Float64MultiArray, "/forward_position_controller/commands", 10)
+        
+        # Service client for controller switching
+        self.controller_switch_client = self.create_client(SwitchController, "/controller_manager/switch_controller")
+
         # Subscribe to tracking control to enable/disable tracking
         self.tracking_control_subscription = self.create_subscription(
             String,
@@ -64,6 +129,62 @@ class StateMachineNode(Node):
         
         self.get_logger().info('State Machine Node initialized in IDLE state.')
         self.get_logger().info('Use begin_tracking(object) to enable tracking.')
+
+        self.current_pos = STANDING  # starting position guess
+        self.trajectory = None  # will become a generator later
+
+    # def switch_mode(self):
+    #     """Switch from neural controllers to forward command controllers."""
+
+    #     self.get_logger().info("Switching to forward mode...")
+
+    #     # Wait for service to be available
+    #     if not self.controller_switch_client.wait_for_service(timeout_sec=5.0):
+    #         self.get_logger().error("Controller switch service not available")
+    #         return
+
+    #     # Create switch request
+    #     neural_controllers = ["neural_controller"]
+    #     forward_controllers = ["forward_command_controller"]
+    #     request = SwitchController.Request()
+    #     request.activate_controllers = forward_controllers
+    #     request.deactivate_controllers = neural_controllers
+    #     request.strictness = SwitchController.Request.BEST_EFFORT
+    #     request.activate_asap = True
+    #     request.timeout = rclpy.duration.Duration(seconds=5.0).to_msg()
+
+    #     try:
+    #         future = self.controller_switch_client.call_async(request)
+    #         future.add_done_callback(self._switch_to_animation_callback)
+
+    #     except Exception as e:
+    #         self.get_logger().error(f"Error switching controllers: {e}")
+
+    def switch_to_position_controller(self):
+        self.get_logger().info("Switching controllers...")
+
+        subprocess.call([
+            "ros2", "control", "switch_controllers",
+            "--deactivate", "neural_controller",
+            "--activate", "forward_command_controller"
+        ])
+
+        self.get_logger().info("Controller switched.")
+
+    def publish(self, pos):
+        print("Publishing to forward commander pos: ", pos)
+        msg = Float64MultiArray()
+        msg.data = pos.tolist()
+        self.position_publisher.publish(msg)
+
+    def smooth_move(self, target, duration=3.0):
+        """Create a generator that smoothly interpolates to the target pose."""
+        start = self.current_pos.copy()
+        steps = int(duration / 0.02)
+
+        for step in range(steps):
+            alpha = (step + 1) / steps
+            yield (1 - alpha) * start + alpha * target
     
     def tracking_control_callback(self, msg):
         """Handle tracking control commands."""
@@ -115,16 +236,20 @@ class StateMachineNode(Node):
         """
         # State machine logic
         if not self.tracking_enabled:
+            self.switch_to_position_controller()
+            self.state = "halfway"
+            self.current_pos = STANDING
+            self.trajectory = self.smooth_move(FULL_BEND, duration=6.0)
+
+            self.tracking_enabled = True
             # Not tracking - stay idle and DON'T publish
             # This allows Karel commands to control the robot
             self.state = State.IDLE
             return
+        pos = next(self.trajectory)
+        self.publish(pos)
+        return
         
-        # TODO: Implement state transition logic based on detection timeout
-        # - Calculate time_since_detection by subtracting self.last_detection_time from current time
-        # - Convert the time difference from nanoseconds to seconds
-        # - If time_since_detection > TIMEOUT, transition to State.SEARCH
-        # - Otherwise, transition to State.TRACK
         time_since_detection = (self.get_clock().now() - self.last_detection_time).nanoseconds * 1e-9   # TODO: Calculate time since last detection
         if time_since_detection > TIMEOUT:  # TODO: Replace with condition checking
             self.state = State.SEARCH
@@ -141,18 +266,10 @@ class StateMachineNode(Node):
             forward_vel_command = 0.0
         
         elif self.state == State.SEARCH:
-            # TODO: Implement search behavior
-            # - Set yaw_command to rotate in the direction where the target was last seen
-            # - Use SEARCH_YAW_VEL and rotate opposite to the sign of self.target_pos
-            # - Keep forward_vel_command = 0.0 (don't move forward while searching)
             forward_vel_command = 0.0
             yaw_command = -SEARCH_YAW_VEL if self.last_detection_pos >=0 else SEARCH_YAW_VEL # TODO: Implement SEARCH state behavior
             
         elif self.state == State.TRACK:
-            # TODO: Implement tracking behavior using proportional control
-            # - Set yaw_command using a proportional controller: -self.target_pos * KP
-            # - This will turn the robot to center the target in the camera view
-            # - Set forward_vel_command to TRACK_FORWARD_VEL to move toward the target
             if self.target_width < STOP_WIDTH:
                 forward_vel_command = TRACK_FORWARD_VEL
                 yaw_command = -self.target_pos * KP
@@ -161,10 +278,9 @@ class StateMachineNode(Node):
             else:
                 forward_vel_command = 0.0
                 yaw_command = 0.0
-                self.tracking_enabled = False
-
-            # yaw_command = -self.target_pos * KP  
-            # forward_vel_command = TRACK_FORWARD_VEL # TODO: Implement TRACK state behavior
+                # self.tracking_enabled = False
+                self.publish_joint_positions()
+                return
 
         cmd = Twist()
         cmd.angular.z = yaw_command
@@ -181,7 +297,7 @@ def main():
         print("Program terminated by user")
     finally:
         zero_cmd = Twist()
-        state_machine_node.command_publisher.publish(zero_cmd)
+        # state_machine_node.command_publisher.publish(zero_cmd)
 
         state_machine_node.destroy_node()
         rclpy.shutdown()
