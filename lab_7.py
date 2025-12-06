@@ -14,6 +14,31 @@ import subprocess
 # Add pupper_llm to path
 sys.path.append(os.path.dirname(__file__))
 
+# ============================================================================
+# AIMING POSE DEFINITIONS (12 joints)
+# Joint order: FR1, FR2, FR3, FL1, FL2, FL3, BR1, BR2, BR3, BL1, BL2, BL3
+# ============================================================================
+
+# Gains for position control (must be set for joints to hold position!)
+# Slightly reduced kp and increased kd for stability (less shaking)
+AIMING_KP = np.array([5.0] * 12)  # Stiffness - lower = less aggressive
+AIMING_KD = np.array([0.5] * 12)  # Damping - higher = less oscillation
+
+# Neutral standing pose - body level
+AIM_MIDDLE = np.array([
+    0.26, 0.0, -0.52,   # Front Right leg (hip, upper, lower)
+    -0.26, 0.0, 0.52,   # Front Left leg
+    0.26, 0.0, -0.52,   # Back Right leg
+    -0.26, 0.0, 0.52,   # Back Left leg
+])
+
+AIM_UP = np.array([
+    0.26, 0, -0.8,    # Front Right: tuck down
+    -0.26, 0, 0.8,    # Front Left: tuck down
+    0.26, 0, -0.3,   # Back Right: extend back/up
+    -0.26, 0, 0.3,   # Back Left: extend back/up
+])
+
 JOINT_NAMES = [
     "leg_front_r_2",
     "leg_front_l_1",
@@ -104,10 +129,8 @@ class StateMachineNode(Node):
             10
         )
         
-        self.position_publisher = self.create_publisher(Float64MultiArray, "/forward_position_controller/commands", 10)
-        
         # Service client for controller switching
-        self.controller_switch_client = self.create_client(SwitchController, "/controller_manager/switch_controller")
+        # self.controller_switch_client = self.create_client(SwitchController, "/controller_manager/switch_controller")
 
         # Subscribe to tracking control to enable/disable tracking
         self.tracking_control_subscription = self.create_subscription(
@@ -115,6 +138,17 @@ class StateMachineNode(Node):
             '/tracking_control',
             self.tracking_control_callback,
             10
+        )
+        
+        # Aiming control - need position, kp, and kd publishers
+        self.position_publisher = self.node.create_publisher(
+            Float64MultiArray, '/forward_position_controller/commands', 10
+        )
+        self.kp_publisher = self.node.create_publisher(
+            Float64MultiArray, '/forward_kp_controller/commands', 10
+        )
+        self.kd_publisher = self.node.create_publisher(
+            Float64MultiArray, '/forward_kd_controller/commands', 10
         )
 
         self.timer = self.create_timer(0.1, self.timer_callback)
@@ -136,44 +170,124 @@ class StateMachineNode(Node):
         self.current_pos = STANDING  # starting position guess
         self.trajectory = None  # will become a generator later
 
-    # def switch_mode(self):
-    #     """Switch from neural controllers to forward command controllers."""
+    def _switch_to_position_controller(self):
+        """Switch from neural_controller to forward position/kp/kd controllers."""
+        if self.state == State.BEND:
+            return  # Already in position control mode
+        
+        self.node.get_logger().info("Switching to position controller...")
+        try:
+            # IMPORTANT: Deactivate neural + activate position in SAME command to avoid gap!
+            # This ensures no moment where motors are uncommanded
+            subprocess.run([
+                "ros2", "control", "switch_controllers",
+                "--deactivate", "neural_controller",
+                "--activate", "forward_position_controller"
+            ], timeout=5)
+            
+            # Now activate the gain controllers (these can be separate since position is already active)
+            subprocess.run([
+                "ros2", "control", "switch_controllers",
+                "--activate", "forward_kp_controller"
+            ], timeout=5)
+            
+            subprocess.run([
+                "ros2", "control", "switch_controllers",
+                "--activate", "forward_kd_controller"
+            ], timeout=5)
+            
+            self.is_aiming_mode = True
+            
+            # Set initial gains and position
+            self._publish_gains()
+            
+            self.node.get_logger().info("Switched to position controller with gains.")
+        except Exception as e:
+            self.node.get_logger().error(f"Failed to switch to position controller: {e}")
+    
+    # def switch_to_position_controller(self):
+    #     self.get_logger().info("Switching controllers...")
 
-    #     self.get_logger().info("Switching to forward mode...")
+    #     subprocess.call([
+    #         "ros2", "control", "switch_controllers",
+    #         "--deactivate", "neural_controller",
+    #         "--activate", "forward_command_controller"
+    #     ])
 
-    #     # Wait for service to be available
-    #     if not self.controller_switch_client.wait_for_service(timeout_sec=5.0):
-    #         self.get_logger().error("Controller switch service not available")
-    #         return
-
-    #     # Create switch request
-    #     neural_controllers = ["neural_controller"]
-    #     forward_controllers = ["forward_command_controller"]
-    #     request = SwitchController.Request()
-    #     request.activate_controllers = forward_controllers
-    #     request.deactivate_controllers = neural_controllers
-    #     request.strictness = SwitchController.Request.BEST_EFFORT
-    #     request.activate_asap = True
-    #     request.timeout = rclpy.duration.Duration(seconds=5.0).to_msg()
-
-    #     try:
-    #         future = self.controller_switch_client.call_async(request)
-    #         future.add_done_callback(self._switch_to_animation_callback)
-
-    #     except Exception as e:
-    #         self.get_logger().error(f"Error switching controllers: {e}")
-
-    def switch_to_position_controller(self):
-        self.get_logger().info("Switching controllers...")
-
-        subprocess.call([
-            "ros2", "control", "switch_controllers",
-            "--deactivate", "neural_controller",
-            "--activate", "forward_command_controller"
-        ])
-
-        self.get_logger().info("Controller switched.")
-
+    #     self.get_logger().info("Controller switched.")
+    def _publish_gains(self):
+        """Publish kp and kd gains to their respective controllers."""
+        kp_msg = Float64MultiArray()
+        kp_msg.data = AIMING_KP.tolist()
+        self.kp_publisher.publish(kp_msg)
+        
+        kd_msg = Float64MultiArray()
+        kd_msg.data = AIMING_KD.tolist()
+        self.kd_publisher.publish(kd_msg)
+        
+        # Also publish current pose to position controller
+        pos_msg = Float64MultiArray()
+        pos_msg.data = self.current_pose.tolist()
+        self.position_publisher.publish(pos_msg)
+        
+        # Spin to ensure messages are transmitted
+        for _ in range(5):
+            rclpy.spin_once(self.node, timeout_sec=0.01)
+        
+        self.node.get_logger().info(f"Published gains kp={AIMING_KP[0]}, kd={AIMING_KD[0]}")
+    
+    def _publish_joint_positions(self, positions: np.ndarray):
+        """Publish joint positions and gains to forward controllers."""
+        # Publish position
+        pos_msg = Float64MultiArray()
+        pos_msg.data = positions.tolist()
+        self.position_publisher.publish(pos_msg)
+        
+        # Publish gains
+        kp_msg = Float64MultiArray()
+        kp_msg.data = AIMING_KP.tolist()
+        self.kp_publisher.publish(kp_msg)
+        
+        kd_msg = Float64MultiArray()
+        kd_msg.data = AIMING_KD.tolist()
+        self.kd_publisher.publish(kd_msg)
+        
+        # Spin to ensure messages are transmitted
+        rclpy.spin_once(self.node, timeout_sec=0.01)
+    
+    def _smooth_move_to_pose(self, target_pose: np.ndarray, duration: float = 1.5):
+        """Smoothly interpolate from current pose to target pose."""
+        start_pose = self.current_pose.copy()
+        step_period = 0.02  # 50Hz update rate (matches lab3's IK timer)
+        steps = int(duration / step_period)
+        
+        self.node.get_logger().info(f"Moving to pose over {steps} steps...")
+        
+        for step in range(steps):
+            alpha = (step + 1) / steps
+            interpolated = (1 - alpha) * start_pose + alpha * target_pose
+            self._publish_joint_positions(interpolated)
+            time.sleep(step_period)
+        
+        # Hold at final position briefly
+        for _ in range(10):
+            self._publish_joint_positions(target_pose)
+            time.sleep(0.02)
+        
+        self.current_pose = target_pose.copy()
+        self.node.get_logger().info("Pose reached.")
+    
+    def aim_up(self, duration: float = 1.5):
+        """
+        Aim the Pupper's body upward.
+        Switches to position control, moves to AIM_UP pose.
+        """
+        self.node.get_logger().info("Aiming UP...")
+        self._switch_to_position_controller()
+        time.sleep(0.2)  # Give controller time to activate
+        self._smooth_move_to_pose(AIM_UP, duration)
+        self.node.get_logger().info("Aiming UP complete.")
+        
     def publish(self, pos):
         print("Publishing to forward commander pos: ", pos)
         msg = Float64MultiArray()
