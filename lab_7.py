@@ -1,4 +1,5 @@
 from enum import Enum
+import time
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, Pose
@@ -141,13 +142,13 @@ class StateMachineNode(Node):
         )
         
         # Aiming control - need position, kp, and kd publishers
-        self.position_publisher = self.node.create_publisher(
+        self.position_publisher = self.create_publisher(
             Float64MultiArray, '/forward_position_controller/commands', 10
         )
-        self.kp_publisher = self.node.create_publisher(
+        self.kp_publisher = self.create_publisher(
             Float64MultiArray, '/forward_kp_controller/commands', 10
         )
-        self.kd_publisher = self.node.create_publisher(
+        self.kd_publisher = self.create_publisher(
             Float64MultiArray, '/forward_kd_controller/commands', 10
         )
 
@@ -168,6 +169,7 @@ class StateMachineNode(Node):
         self.get_logger().info('Use begin_tracking(object) to enable tracking.')
 
         self.current_pos = STANDING  # starting position guess
+        self.current_pose = AIM_MIDDLE.copy()  # Track current joint positions
         self.trajectory = None  # will become a generator later
 
     def _switch_to_position_controller(self):
@@ -175,7 +177,7 @@ class StateMachineNode(Node):
         if self.state == State.BEND:
             return  # Already in position control mode
         
-        self.node.get_logger().info("Switching to position controller...")
+        self.get_logger().info("Switching to position controller...")
         try:
             # IMPORTANT: Deactivate neural + activate position in SAME command to avoid gap!
             # This ensures no moment where motors are uncommanded
@@ -196,14 +198,14 @@ class StateMachineNode(Node):
                 "--activate", "forward_kd_controller"
             ], timeout=5)
             
-            self.is_aiming_mode = True
+            # self.is_aiming_mode = True
             
             # Set initial gains and position
             self._publish_gains()
             
-            self.node.get_logger().info("Switched to position controller with gains.")
+            self.get_logger().info("Switched to position controller with gains.")
         except Exception as e:
-            self.node.get_logger().error(f"Failed to switch to position controller: {e}")
+            self.get_logger().error(f"Failed to switch to position controller: {e}")
     
     # def switch_to_position_controller(self):
     #     self.get_logger().info("Switching controllers...")
@@ -232,9 +234,9 @@ class StateMachineNode(Node):
         
         # Spin to ensure messages are transmitted
         for _ in range(5):
-            rclpy.spin_once(self.node, timeout_sec=0.01)
+            rclpy.spin_once(self, timeout_sec=0.01)
         
-        self.node.get_logger().info(f"Published gains kp={AIMING_KP[0]}, kd={AIMING_KD[0]}")
+        self.get_logger().info(f"Published gains kp={AIMING_KP[0]}, kd={AIMING_KD[0]}")
     
     def _publish_joint_positions(self, positions: np.ndarray):
         """Publish joint positions and gains to forward controllers."""
@@ -253,7 +255,7 @@ class StateMachineNode(Node):
         self.kd_publisher.publish(kd_msg)
         
         # Spin to ensure messages are transmitted
-        rclpy.spin_once(self.node, timeout_sec=0.01)
+        rclpy.spin_once(self, timeout_sec=0.01)
     
     def _smooth_move_to_pose(self, target_pose: np.ndarray, duration: float = 1.5):
         """Smoothly interpolate from current pose to target pose."""
@@ -261,7 +263,7 @@ class StateMachineNode(Node):
         step_period = 0.02  # 50Hz update rate (matches lab3's IK timer)
         steps = int(duration / step_period)
         
-        self.node.get_logger().info(f"Moving to pose over {steps} steps...")
+        self.get_logger().info(f"Moving to pose over {steps} steps...")
         
         for step in range(steps):
             alpha = (step + 1) / steps
@@ -275,19 +277,19 @@ class StateMachineNode(Node):
             time.sleep(0.02)
         
         self.current_pose = target_pose.copy()
-        self.node.get_logger().info("Pose reached.")
+        self.get_logger().info("Pose reached.")
     
     def aim_up(self, duration: float = 1.5):
         """
         Aim the Pupper's body upward.
         Switches to position control, moves to AIM_UP pose.
         """
-        self.node.get_logger().info("Aiming UP...")
+        self.get_logger().info("Aiming UP...")
         self._switch_to_position_controller()
         time.sleep(0.2)  # Give controller time to activate
         self._smooth_move_to_pose(AIM_UP, duration)
-        self.node.get_logger().info("Aiming UP complete.")
-        
+        self.get_logger().info("Aiming UP complete.")
+
     def publish(self, pos):
         print("Publishing to forward commander pos: ", pos)
         msg = Float64MultiArray()
@@ -354,6 +356,9 @@ class StateMachineNode(Node):
             # This allows Karel commands to control the robot
             self.state = State.IDLE
             return
+
+        self.aim_up()
+        return
         
         # State transition based on detection timeout
         time_since_detection = (self.get_clock().now() - self.last_detection_time).nanoseconds * 1e-9   
