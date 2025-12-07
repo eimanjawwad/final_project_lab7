@@ -154,7 +154,7 @@ class StateMachineNode(Node):
                     self.tracking_enabled = False              
                 else: 
                     # Rotate to center on target horizontally
-                    yaw_command = -SEARCH_YAW_VEL * 0.2 if self.target_pos < 0 else SEARCH_YAW_VEL * 0.2                    
+                    yaw_command = -SEARCH_YAW_VEL if self.last_detection_pos >=0 else SEARCH_YAW_VEL                    
                     self.get_logger().info('yaw_command: ' + str(yaw_command))
 
         cmd = Twist()
