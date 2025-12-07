@@ -135,12 +135,9 @@ class KarelRealtimeCommanderNode(Node):
                     "move left", "move right", "go left", "go right", "walk left", "walk right",
                     "backward", "back", "reverse", 
                     "bob", "wiggle", "dance", "bark", "wag",
-                    "stop"]
+                    "stop", "shoot"]
         order = {}
-        # new for final
-        if "walk to" in line and "target" in line:
-            return ["walk_to_target"]
-        #   
+
         for c in commands:
             if c in line:
                 order[line.find(c)] = c.replace(" ", "_")
@@ -180,6 +177,28 @@ class KarelRealtimeCommanderNode(Node):
             #   - For "dance" actions, the full dance is ~12.0 seconds; use await asyncio.sleep(12.0)
             #   - For most normal moves and turns, use 0.5 seconds.
             # See the KarelPupper API for supported commands and their method names.
+            elif command == "shoot":
+                # Final project shoot basketball
+                logger.info("=== Start Shooting Basketball ===")
+                self.pupper.begin_tracking('stop sign')
+    
+                while self.pupper.tracking_enabled:
+                    await asyncio.sleep(0.5)
+                
+                logger.info("=== End Shooting Basketball ===")
+                self.pupper.end_tracking()
+                
+                logger.info("=== Aiming up ===")
+                self.pupper.aim_up(percent=100.0)
+                logger.info("Holding up pose for 5 seconds...")
+                await asyncio.sleep(5)
+
+                # TODO: Add shooting mechanism here (e.g., trigger servo/motor)
+
+                logger.info("=== Resuming walking mode ===")
+                self.pupper.resume_walking()
+                logger.info("Shoot sequence complete!")
+                await asyncio.sleep(0.5)
             elif command in ["turn_left", "rotate_left", "counter_clockwise"]:
                 self.pupper.turn_left()
                 await asyncio.sleep(0.5)
@@ -220,12 +239,6 @@ class KarelRealtimeCommanderNode(Node):
                 # Bark plays audio, give it time to complete
                 self.pupper.end_tracking()
                 await asyncio.sleep(0.5)
-            # new for final
-            elif command == "walk_to_target":
-                logger.info("Walking toward tracked target…")
-                self.pupper.walk_toward_target("cat") 
-                await asyncio.sleep(0.1)
-            #    
             else:
                 logger.warning(f"⚠️  Unknown command: {command}")
                 return False
@@ -314,4 +327,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
