@@ -257,28 +257,6 @@ class StateMachineNode(Node):
         # Spin to ensure messages are transmitted
         rclpy.spin_once(self, timeout_sec=0.01)
     
-    def _smooth_move_to_pose(self, target_pose: np.ndarray, duration: float = 1.5):
-        """Smoothly interpolate from current pose to target pose."""
-        start_pose = self.current_pose.copy()
-        step_period = 0.02  # 50Hz update rate (matches lab3's IK timer)
-        steps = int(duration / step_period)
-        
-        self.get_logger().info(f"Moving to pose over {steps} steps...")
-        
-        for step in range(steps):
-            alpha = (step + 1) / steps
-            interpolated = (1 - alpha) * start_pose + alpha * target_pose
-            self._publish_joint_positions(interpolated)
-            time.sleep(step_period)
-        
-        # Hold at final position briefly
-        for _ in range(10):
-            self._publish_joint_positions(target_pose)
-            time.sleep(0.02)
-        
-        self.current_pose = target_pose.copy()
-        self.get_logger().info("Pose reached.")
-    
     def aim_up(self, duration: float = 1.5):
         """
         Aim the Pupper's body upward.

@@ -342,15 +342,16 @@ class StateMachineNode(Node):
         Timer callback that manages state transitions and controls robot motion.
         Called periodically (every 0.1 seconds) to update the robot's behavior.
         """
-        self.get_logger().info("Timer callback.")
+        self.get_logger().info("Timer callback AHHHHHHHHHH")
         if not self.tracking_enabled:
             # create trajectory only once when entering this condition
+            self.get_logger().info("TRACKING NOT ENABLEDH")
             if self.trajectory is None:
                 self.aim_up(duration=1.5)   # will create self.trajectory
                 self.tracking_enabled = True
             # do not enable tracking here — leave it controlled by tracking_control_callback
             return
-        self.get_logger().info("Timer callback.")
+        self.get_logger().info("TRACKING ENABLED")
         # If we have an active trajectory, step it once per timer tick:
         if self.trajectory is not None:
             self.get_logger().info("trajectory active")
