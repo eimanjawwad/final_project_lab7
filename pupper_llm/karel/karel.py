@@ -1,12 +1,54 @@
-# karel.py - Enhanced with Object Tracking
+# karel.py - Enhanced with Object Tracking and Aiming
 import time
 import os
+import subprocess
+import numpy as np
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
-from std_msgs.msg import String
+from std_msgs.msg import String, Float64MultiArray
 import simpleaudio as sa
 import pygame
+
+# ============================================================================
+# AIMING POSE DEFINITIONS (12 joints)
+# Joint order: FR1, FR2, FR3, FL1, FL2, FL3, BR1, BR2, BR3, BL1, BL2, BL3
+# ============================================================================
+
+# Gains for position control (must be set for joints to hold position!)
+# Slightly reduced kp and increased kd for stability (less shaking)
+AIMING_KP = np.array([2.0] * 12)  # Stiffness - lower = less aggressive
+AIMING_KD = np.array([0.5] * 12)  # Damping - higher = less oscillation
+
+# TODO: Tune these values on real robot!
+AIM_DOWN = np.array([
+    0.26, 0, -0.3,   # Front Right: extend forward/up
+    -0.26, 0, 0.3,   # Front Left: extend forward/up
+    0.26, 0, -0.8,    # Back Right: tuck down
+    -0.26, 0, 0.8,    # Back Left: tuck down
+])
+
+# Neutral standing pose - body level
+AIM_MIDDLE = np.array([
+    0.6564781951904297, -0.11901561737060545, -1.3869715118408203,
+    -0.8018210220336914, 0.13694469451904295, 1.3835382843017578,
+    0.4100449371337891, 0.12970645904541017, -1.3736191177368164,
+    -0.5397475051879883, -0.02251155853271486, 1.3099127197265625,
+])
+
+AIM_UP = np.array([
+    0.9048188018798828, -0.02936927795410149, -1.0447874450683594,
+    -0.954029350280762, -0.07515533447265627, 1.1725817108154297, 
+    -0.5, 0, 0.5,    # Back Right: tuck down
+    0.5, 0, -0.5,    # Back Left: tuck down
+])
+
+AIMING_POSES = {
+    "up": AIM_UP,
+    "middle": AIM_MIDDLE,
+    "down": AIM_DOWN,
+}
+
 
 class KarelPupper:
     def start():
@@ -25,6 +67,226 @@ class KarelPupper:
         )
         self.tracking_enabled = False
         self.tracking_object = None
+        
+        # Aiming control - need position, kp, and kd publishers
+        self.position_publisher = self.node.create_publisher(
+            Float64MultiArray, '/forward_position_controller/commands', 10
+        )
+        self.kp_publisher = self.node.create_publisher(
+            Float64MultiArray, '/forward_kp_controller/commands', 10
+        )
+        self.kd_publisher = self.node.create_publisher(
+            Float64MultiArray, '/forward_kd_controller/commands', 10
+        )
+        self.current_pose = AIM_MIDDLE.copy()  # Track current joint positions
+        self.is_aiming_mode = False  # Track if we're in aiming mode (position control)
+
+    # ========================================================================
+    # CONTROLLER SWITCHING
+    # ========================================================================
+    
+    def _switch_to_position_controller(self):
+        """Switch from neural_controller to forward position/kp/kd controllers."""
+        if self.is_aiming_mode:
+            return  # Already in position control mode
+        
+        self.node.get_logger().info("Switching to position controller...")
+        try:
+            # IMPORTANT: Deactivate neural + activate position in SAME command to avoid gap!
+            # This ensures no moment where motors are uncommanded
+            subprocess.run([
+                "ros2", "control", "switch_controllers",
+                "--deactivate", "neural_controller",
+                "--activate", "forward_position_controller"
+            ], timeout=5)
+            
+            # Now activate the gain controllers (these can be separate since position is already active)
+            subprocess.run([
+                "ros2", "control", "switch_controllers",
+                "--activate", "forward_kp_controller"
+            ], timeout=5)
+            
+            subprocess.run([
+                "ros2", "control", "switch_controllers",
+                "--activate", "forward_kd_controller"
+            ], timeout=5)
+            
+            self.is_aiming_mode = True
+            
+            # Set initial gains and position
+            self._publish_gains()
+            
+            self.node.get_logger().info("Switched to position controller with gains.")
+        except Exception as e:
+            self.node.get_logger().error(f"Failed to switch to position controller: {e}")
+    
+    def _switch_to_neural_controller(self):
+        """Switch from forward controllers back to neural_controller."""
+        if not self.is_aiming_mode:
+            return  # Already in neural control mode
+        
+        self.node.get_logger().info("Switching to neural controller...")
+        try:
+            # Must switch controllers ONE AT A TIME
+            
+            # 1. Deactivate forward controllers
+            subprocess.run([
+                "ros2", "control", "switch_controllers",
+                "--deactivate", "forward_position_controller"
+            ], timeout=5)
+            
+            subprocess.run([
+                "ros2", "control", "switch_controllers",
+                "--deactivate", "forward_kp_controller"
+            ], timeout=5)
+            
+            subprocess.run([
+                "ros2", "control", "switch_controllers",
+                "--deactivate", "forward_kd_controller"
+            ], timeout=5)
+            
+            # 2. Activate neural_controller
+            subprocess.run([
+                "ros2", "control", "switch_controllers",
+                "--activate", "neural_controller"
+            ], timeout=5)
+            
+            self.is_aiming_mode = False
+            self.node.get_logger().info("Switched to neural controller.")
+        except Exception as e:
+            self.node.get_logger().error(f"Failed to switch to neural controller: {e}")
+    
+    # ========================================================================
+    # AIMING FUNCTIONS
+    # ========================================================================
+    
+    def _publish_gains(self):
+        """Publish kp and kd gains to their respective controllers."""
+        kp_msg = Float64MultiArray()
+        kp_msg.data = AIMING_KP.tolist()
+        self.kp_publisher.publish(kp_msg)
+        
+        kd_msg = Float64MultiArray()
+        kd_msg.data = AIMING_KD.tolist()
+        self.kd_publisher.publish(kd_msg)
+        
+        # Also publish current pose to position controller
+        pos_msg = Float64MultiArray()
+        pos_msg.data = self.current_pose.tolist()
+        self.position_publisher.publish(pos_msg)
+        
+        # Spin to ensure messages are transmitted
+        for _ in range(5):
+            rclpy.spin_once(self.node, timeout_sec=0.01)
+        
+        self.node.get_logger().info(f"Published gains kp={AIMING_KP[0]}, kd={AIMING_KD[0]}")
+    
+    def _publish_joint_positions(self, positions: np.ndarray):
+        """Publish joint positions and gains to forward controllers."""
+        # Publish position
+        pos_msg = Float64MultiArray()
+        pos_msg.data = positions.tolist()
+        self.position_publisher.publish(pos_msg)
+        
+        # Publish gains
+        kp_msg = Float64MultiArray()
+        kp_msg.data = AIMING_KP.tolist()
+        self.kp_publisher.publish(kp_msg)
+        
+        kd_msg = Float64MultiArray()
+        kd_msg.data = AIMING_KD.tolist()
+        self.kd_publisher.publish(kd_msg)
+        
+        # Spin to ensure messages are transmitted
+        rclpy.spin_once(self.node, timeout_sec=0.01)
+    
+    def _smooth_move_to_pose(self, target_pose: np.ndarray, duration: float = 1.5):
+        """Smoothly interpolate from current pose to target pose."""
+        start_pose = self.current_pose.copy()
+        step_period = 0.02  # 50Hz update rate (matches lab3's IK timer)
+        steps = int(duration / step_period)
+        
+        self.node.get_logger().info(f"Moving to pose over {steps} steps...")
+        
+        for step in range(steps):
+            alpha = (step + 1) / steps
+            interpolated = (1 - alpha) * start_pose + alpha * target_pose
+            self._publish_joint_positions(interpolated)
+            time.sleep(step_period)
+        
+        # Hold at final position briefly
+        for _ in range(10):
+            self._publish_joint_positions(target_pose)
+            time.sleep(0.02)
+        
+        self.current_pose = target_pose.copy()
+        self.node.get_logger().info("Pose reached.")
+    
+    def aim_up(self, duration: float = 1.5):
+        """
+        Aim the Pupper's body upward.
+        Switches to position control, moves to AIM_UP pose.
+        """
+        self.node.get_logger().info("Aiming UP...")
+        self._switch_to_position_controller()
+        time.sleep(0.2)  # Give controller time to activate
+        self._smooth_move_to_pose(AIM_UP, duration)
+        self.node.get_logger().info("Aiming UP complete.")
+    
+    def aim_middle(self, duration: float = 1.5):
+        """
+        Aim the Pupper's body to middle/neutral position.
+        Switches to position control, moves to AIM_MIDDLE pose.
+        """
+        self.node.get_logger().info("Aiming MIDDLE...")
+        self._switch_to_position_controller()
+        time.sleep(0.2)
+        self._smooth_move_to_pose(AIM_MIDDLE, duration)
+        self.node.get_logger().info("Aiming MIDDLE complete.")
+    
+    def aim_down(self, duration: float = 1.5):
+        """
+        Aim the Pupper's body downward.
+        Switches to position control, moves to AIM_DOWN pose.
+        """
+        self.node.get_logger().info("Aiming DOWN...")
+        self._switch_to_position_controller()
+        time.sleep(0.2)
+        self._smooth_move_to_pose(AIM_DOWN, duration)
+        self.node.get_logger().info("Aiming DOWN complete.")
+    
+    def aim(self, direction: str, duration: float = 1.5):
+        """
+        Aim the Pupper in a specified direction.
+        
+        Args:
+            direction: One of "up", "middle", or "down"
+            duration: Time in seconds for the movement
+        """
+        direction = direction.lower().strip()
+        if direction not in AIMING_POSES:
+            self.node.get_logger().warning(f"Unknown aim direction: {direction}")
+            return
+        
+        self.node.get_logger().info(f"Aiming {direction.upper()}...")
+        self._switch_to_position_controller()
+        time.sleep(0.2)
+        self._smooth_move_to_pose(AIMING_POSES[direction], duration)
+        self.node.get_logger().info(f"Aiming {direction.upper()} complete.")
+    
+    def resume_walking(self):
+        """
+        Return to neural controller for walking.
+        First moves to neutral pose, then switches controller.
+        """
+        self.node.get_logger().info("Resuming walking mode...")
+        if self.is_aiming_mode:
+            # First return to neutral standing pose
+            self._smooth_move_to_pose(AIM_MIDDLE, duration=1.0)
+            time.sleep(0.1)
+        self._switch_to_neural_controller()
+        self.node.get_logger().info("Walking mode resumed.")
+
     #new for final
     def walk_toward_target(self, target="stop sign"):
         self.begin_tracking(target)
