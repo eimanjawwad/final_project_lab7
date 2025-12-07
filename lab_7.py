@@ -13,8 +13,8 @@ sys.path.append(os.path.dirname(__file__))
 
 IMAGE_WIDTH = 700
 IMAGE_HEIGHT = 525
-STOP_WIDTH = 60  # width at which pupper should stop
-AIM_PRECISION = 0.05  # precision for vertical centering during bending
+STOP_WIDTH = 80  # width at which pupper should stop
+AIM_PRECISION = 0.1  # precision for vertical centering during bending
 
 # TODO: Define constants for the state machine behavior
 TIMEOUT = 2  # TODO: Set the timeout threshold (in seconds) for determining when a detection is too old
@@ -140,21 +140,22 @@ class StateMachineNode(Node):
             
         elif self.state == State.TRACK:
             # Stops a distance from the target
-            if self.target_width < STOP_WIDTH:
+            if self.target_width < STOP_WIDTH: 
                 yaw_command = -self.target_pos * KP
 
                 # Slows down as it gets closer
-                dist_scale = np.clip((STOP_WIDTH - self.target_width) / STOP_WIDTH, 0.0, 1.0)
-                forward_vel_command = TRACK_FORWARD_VEL * dist_scale
+                # dist_scale = np.clip((STOP_WIDTH - self.target_width) / STOP_WIDTH, 0.0, 1.0)
+                forward_vel_command = TRACK_FORWARD_VEL #* dist_scale
             else: 
                 # Center to target horizontally 
-                if abs(self.target_pos_y) <= AIM_PRECISION:
-                    # Transition to BEND state and switch to Forward Controller
-                    self.aim_up()
-                    self.state = State.IDLE              
+                self.get_logger().info('self.target_pos: '+ str(abs(self.target_pos)) + ', AIM_PRECISION: ' + str(AIM_PRECISION))
+                if abs(self.target_pos) <= AIM_PRECISION:
+                    self.state = State.IDLE
+                    self.tracking_enabled = False              
                 else: 
                     # Rotate to center on target horizontally
-                    yaw_command = -self.target_pos * KP
+                    yaw_command = -SEARCH_YAW_VEL * 0.2 if self.target_pos < 0 else SEARCH_YAW_VEL * 0.2                    
+                    self.get_logger().info('yaw_command: ' + str(yaw_command))
 
         cmd = Twist()
         cmd.angular.z = yaw_command
