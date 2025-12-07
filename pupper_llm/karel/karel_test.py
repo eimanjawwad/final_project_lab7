@@ -13,20 +13,10 @@ def main():
     time.sleep(0.5)
     
     print("\n=== Testing aim_up ===")
-    pupper.aim_up()
+    pupper.aim_up(percent=100.0)
     print("Holding up pose for 3 seconds...")
     time.sleep(2)
-    
-    # print("\n=== Testing aim_down ===")
-    # pupper.aim_down()
-    # print("Holding down pose for 3 seconds...")
-    # time.sleep(3)
-    
-    # print("\n=== Returning to middle ===")
-    # pupper.aim_middle()
-    # print("Holding middle pose for 2 seconds...")
-    # time.sleep(2)
-    
+
     print("\n=== Resuming walking mode ===")
     pupper.resume_walking()
     print("Done!")
