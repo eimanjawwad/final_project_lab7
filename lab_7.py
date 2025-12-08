@@ -12,13 +12,15 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 IMAGE_WIDTH = 700
-STOP_WIDTH = 60  # width at which pupper should stop
+IMAGE_HEIGHT = 525
+STOP_WIDTH = 80  # width at which pupper should stop
+AIM_PRECISION = 0.1  # precision for vertical centering during bending
 
 # TODO: Define constants for the state machine behavior
 TIMEOUT = 2  # TODO: Set the timeout threshold (in seconds) for determining when a detection is too old
 SEARCH_YAW_VEL = np.pi/4  # TODO: Set the angular velocity (rad/s) for rotating while searching for the target
-TRACK_FORWARD_VEL = 0.3  # TODO: Set the forward velocity (m/s) while tracking the target
-KP = 6.0  # TODO: Set the proportional gain for the proportional controller that centers the target
+TRACK_FORWARD_VEL = 0.2  # TODO: Set the forward velocity (m/s) while tracking the target
+KP = 5.0  # TODO: Set the proportional gain for the proportional controller that centers the target
 
 class State(Enum):
     IDLE = 0     # Stay in place, no tracking
@@ -113,18 +115,12 @@ class StateMachineNode(Node):
         Timer callback that manages state transitions and controls robot motion.
         Called periodically (every 0.1 seconds) to update the robot's behavior.
         """
-        # State machine logic
         if not self.tracking_enabled:
             # Not tracking - stay idle and DON'T publish
             # This allows Karel commands to control the robot
             self.state = State.IDLE
-            return
+            return 
         
-        # TODO: Implement state transition logic based on detection timeout
-        # - Calculate time_since_detection by subtracting self.last_detection_time from current time
-        # - Convert the time difference from nanoseconds to seconds
-        # - If time_since_detection > TIMEOUT, transition to State.SEARCH
-        # - Otherwise, transition to State.TRACK
         time_since_detection = (self.get_clock().now() - self.last_detection_time).nanoseconds * 1e-9   # TODO: Calculate time since last detection
         if time_since_detection > TIMEOUT:  # TODO: Replace with condition checking
             self.state = State.SEARCH
@@ -136,35 +132,30 @@ class StateMachineNode(Node):
         forward_vel_command = 0.0
 
         if self.state == State.IDLE:
-            # Stay still
             yaw_command = 0.0
             forward_vel_command = 0.0
         
         elif self.state == State.SEARCH:
-            # TODO: Implement search behavior
-            # - Set yaw_command to rotate in the direction where the target was last seen
-            # - Use SEARCH_YAW_VEL and rotate opposite to the sign of self.target_pos
-            # - Keep forward_vel_command = 0.0 (don't move forward while searching)
-            forward_vel_command = 0.0
-            yaw_command = -SEARCH_YAW_VEL if self.last_detection_pos >=0 else SEARCH_YAW_VEL # TODO: Implement SEARCH state behavior
+            yaw_command = -SEARCH_YAW_VEL if self.last_detection_pos >=0 else SEARCH_YAW_VEL 
             
         elif self.state == State.TRACK:
-            # TODO: Implement tracking behavior using proportional control
-            # - Set yaw_command using a proportional controller: -self.target_pos * KP
-            # - This will turn the robot to center the target in the camera view
-            # - Set forward_vel_command to TRACK_FORWARD_VEL to move toward the target
-            if self.target_width < STOP_WIDTH:
-                forward_vel_command = TRACK_FORWARD_VEL
+            # Stops a distance from the target
+            if self.target_width < STOP_WIDTH: 
                 yaw_command = -self.target_pos * KP
-                #dist_scale = np.clip((STOP_WIDTH - self.target_width) / STOP_WIDTH, 0.0, 1.0)
-                #forward_vel_command = TRACK_FORWARD_VEL * dist_scale
-            else:
-                forward_vel_command = 0.0
-                yaw_command = 0.0
-                self.tracking_enabled = False
 
-            # yaw_command = -self.target_pos * KP  
-            # forward_vel_command = TRACK_FORWARD_VEL # TODO: Implement TRACK state behavior
+                # Slows down as it gets closer
+                # dist_scale = np.clip((STOP_WIDTH - self.target_width) / STOP_WIDTH, 0.0, 1.0)
+                forward_vel_command = TRACK_FORWARD_VEL #* dist_scale
+            else: 
+                # Center to target horizontally 
+                self.get_logger().info('self.target_pos: '+ str(abs(self.target_pos)) + ', AIM_PRECISION: ' + str(AIM_PRECISION))
+                if abs(self.target_pos) <= AIM_PRECISION:
+                    self.state = State.IDLE
+                    self.tracking_enabled = False              
+                else: 
+                    # Rotate to center on target horizontally
+                    yaw_command = -SEARCH_YAW_VEL if self.last_detection_pos >=0 else SEARCH_YAW_VEL                    
+                    self.get_logger().info('yaw_command: ' + str(yaw_command))
 
         cmd = Twist()
         cmd.angular.z = yaw_command

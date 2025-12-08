@@ -1,11 +1,9 @@
 from launch import LaunchDescription
-from launch.actions import RegisterEventHandler
-from launch.event_handlers import OnProcessExit
-from launch.substitutions import Command, FindExecutable, PathJoinSubstitution, ThisLaunchFileDir
+from launch.substitutions import Command, PathJoinSubstitution
 from launch_ros.parameter_descriptions import ParameterFile
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
-
+from launch.substitutions import FindExecutable
 
 def generate_launch_description():
     # Get URDF via xacro
@@ -31,7 +29,7 @@ def generate_launch_description():
         parameters=[robot_description],
     )
 
-    # Use neural_controller package config (same as lab_6)
+    # Controller YAML
     robot_controllers = ParameterFile(
         PathJoinSubstitution(
             [
@@ -43,13 +41,15 @@ def generate_launch_description():
         allow_substs=True,
     )
 
+    # ros2_control node
     control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[robot_controllers],
+        parameters=[robot_description, robot_controllers],
         output="both",
     )
 
+    # Spawners
     robot_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
@@ -91,6 +91,19 @@ def generate_launch_description():
         executable="camera_node",
         output="both",
         parameters=[{"format": "RGB888", "width": 1400, "height": 1050}],
+    )    
+
+    forward_position_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
+            "forward_position_controller",
+            "--controller-manager",
+            "/controller_manager",
+            "--controller-manager-timeout",
+            "30",
+            "--inactive",
+        ],
     )
 
     nodes = [
@@ -99,7 +112,8 @@ def generate_launch_description():
         control_node,
         robot_controller_spawner,
         joint_state_broadcaster_spawner,
-        camera_node,
+        camera_node,        
+        forward_position_controller_spawner,
     ]
 
     return LaunchDescription(nodes)

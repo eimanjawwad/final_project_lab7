@@ -13,7 +13,7 @@ def main():
     time.sleep(0.5)
     
     print("\n=== Testing aim_up ===")
-    pupper.aim_up(percent=60.0)
+    pupper.aim_up(percent=100.0)
     print("Holding up pose for 3 seconds...")
     time.sleep(2)
 
