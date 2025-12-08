@@ -78,7 +78,7 @@ sleep 3
 
 # Start tracking state machine - silenced
 echo "4️⃣  Launching Tracking State Machine..."
-python "$PROJECT_ROOT/lab_7.py" > /dev/null 2>&1 &
+python "$PROJECT_ROOT/lab_7.py" > /tmp/tracking_test.log 2>&1 &
 STATE_PID=$!
 sleep 2
 
