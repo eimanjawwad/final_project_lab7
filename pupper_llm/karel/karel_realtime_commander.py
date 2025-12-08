@@ -193,12 +193,19 @@ class KarelRealtimeCommanderNode(Node):
                 
                 logger.info("=== End Shooting Basketball ===")
                 self.pupper.end_tracking()
+                with open("tracking_status.txt", "w") as f: # Clears the file
+                    f.truncate(0)
                 await asyncio.sleep(0.5)
                 
                 logger.info("=== Aiming up ===")
-                self.pupper.aim_up(percent=100.0)
+                self.pupper.aim_up(percent=60.0)
                 logger.info("Holding up pose for 5 seconds...")
                 await asyncio.sleep(5)
+
+                logger.info("=== Aiming up ===")
+                self.pupper.aim_middle()
+                logger.info("Holding up pose for 5 seconds...")
+                await asyncio.sleep(0.5)
 
                 # TODO: Add shooting mechanism here (e.g., trigger servo/motor)
 

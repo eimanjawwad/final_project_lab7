@@ -267,7 +267,7 @@ class KarelPupper:
         self.node.get_logger().info(f"Walking toward {target}...")
 
     def press_trigger(self):
-        shooting_mech.main()
+        shooting_mech.shoot_once()
 
     def begin_tracking(self, obj: str = "person"):
         self.tracking_enabled = True
