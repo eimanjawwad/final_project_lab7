@@ -9,6 +9,7 @@ from geometry_msgs.msg import Twist
 from std_msgs.msg import String, Float64MultiArray
 import simpleaudio as sa
 import pygame
+import shooting_mech
 
 # ============================================================================
 # AIMING POSE DEFINITIONS (12 joints)
@@ -261,10 +262,12 @@ class KarelPupper:
         self._switch_to_neural_controller()
         self.node.get_logger().info("Walking mode resumed.")
 
-    #new for final
     def walk_toward_target(self, target="stop sign"):
         self.begin_tracking(target)
         self.node.get_logger().info(f"Walking toward {target}...")
+
+    def press_trigger(self):
+        shooting_mech.main()
 
     def begin_tracking(self, obj: str = "person"):
         self.tracking_enabled = True
