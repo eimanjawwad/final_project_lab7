@@ -3,7 +3,7 @@ from time import sleep
 
 PIN = 16   # GPIO pin number
 
-def main():
+def shoot_once():
     out = LED(PIN)
 
     print("Sending 1-second HIGH pulse on GPIO 16...")
@@ -12,5 +12,3 @@ def main():
     out.off()          # LOW (0V)
     print("Pulse complete. GPIO 16 is LOW.")
 
-if __name__ == "__main__":
-    main()
