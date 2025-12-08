@@ -106,14 +106,42 @@ def generate_launch_description():
         ],
     )
 
+    forward_kp_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
+            "forward_kp_controller",
+            "--controller-manager",
+            "/controller_manager",
+            "--controller-manager-timeout",
+            "30",
+            "--inactive",
+        ],
+    )
+
+    forward_kd_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
+            "forward_kd_controller",
+            "--controller-manager",
+            "/controller_manager",
+            "--controller-manager-timeout",
+            "30",
+            "--inactive",
+        ],
+    )
+
     nodes = [
         robot_state_publisher,
         imu_sensor_broadcaster_spawner,
         control_node,
-        robot_controller_spawner,
+        robot_controller_spawner,        
+        forward_position_controller_spawner,
+        forward_kp_controller_spawner,
+        forward_kd_controller_spawner,
         joint_state_broadcaster_spawner,
         camera_node,        
-        forward_position_controller_spawner,
     ]
 
     return LaunchDescription(nodes)
