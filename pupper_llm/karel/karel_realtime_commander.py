@@ -183,10 +183,12 @@ class KarelRealtimeCommanderNode(Node):
                 self.pupper.begin_tracking('stop sign')
     
                 while self.pupper.tracking_enabled:
+                    logger.info("in while loop tracking enabled")
                     await asyncio.sleep(0.5)
                 
                 logger.info("=== End Shooting Basketball ===")
                 self.pupper.end_tracking()
+                await asyncio.sleep(0.5)
                 
                 logger.info("=== Aiming up ===")
                 self.pupper.aim_up(percent=100.0)
