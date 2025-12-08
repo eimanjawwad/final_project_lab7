@@ -200,14 +200,16 @@ class KarelRealtimeCommanderNode(Node):
                 logger.info("=== Aiming up ===")
                 self.pupper.aim_up(percent=60.0)
                 logger.info("Holding up pose for 5 seconds...")
-                await asyncio.sleep(5)
+                await asyncio.sleep(3.0)
+
+                # TODO: Add shooting mechanism here (e.g., trigger servo/motor)
+                self.pupper.press_trigger()
+                await asyncio.sleep(8.0)  # wait for shooting action to complete
 
                 logger.info("=== Aiming up ===")
                 self.pupper.aim_middle()
                 logger.info("Holding up pose for 5 seconds...")
-                await asyncio.sleep(0.5)
-
-                # TODO: Add shooting mechanism here (e.g., trigger servo/motor)
+                await asyncio.sleep(2.0)
 
                 logger.info("=== Resuming walking mode ===")
                 self.pupper.resume_walking()

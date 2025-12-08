@@ -243,6 +243,7 @@ class KarelPupper:
         Aim the Pupper's body to middle/neutral position.
         Switches to position control, moves to AIM_MIDDLE pose.
         """
+        self.current_pose = AIM_UP.copy()
         self.node.get_logger().info("Aiming MIDDLE...")
         self._switch_to_position_controller()
         time.sleep(0.2)
@@ -478,7 +479,6 @@ class KarelPupper:
         move_cmd.angular.z = 0.0
         self.publisher.publish(move_cmd)
         rclpy.spin_once(self.node, timeout_sec=1.0)
-    
     
     def __del__(self):
         self.node.get_logger().info('Tearing down...')

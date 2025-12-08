@@ -1,14 +1,16 @@
-from gpiozero import LED
+import lgpio
 from time import sleep
 
-PIN = 16   # GPIO pin number
+PIN = 26   # GPIO pin number
 
 def shoot_once():
-    out = LED(PIN)
+    chip = lgpio.gpiochip_open(0)  # Open GPIO chip 0
+    lgpio.gpio_claim_output(chip, PIN)  # Claim GPIO pin as output
 
-    print("Sending 1-second HIGH pulse on GPIO 16...")
-    out.on()           # HIGH (3.3V)
+    print("Sending 1-second HIGH pulse on GPIO 26...")
+    # while True:
+    lgpio.gpio_write(chip, PIN, 1)           # HIGH (3.3V)
     sleep(1.0)         # keep it high for 1 second
-    out.off()          # LOW (0V)
-    print("Pulse complete. GPIO 16 is LOW.")
-
+    lgpio.gpio_write(chip, PIN, 0)          # LOW (0V)
+    lgpio.gpiochip_close(chip)                     # Clean up GPIO settings
+    print("Pulse complete. GPIO 26 is LOW.")
