@@ -247,8 +247,8 @@ class KarelPupper:
         """
         self.current_pose = target_pose.copy()
         self.node.get_logger().info("Aiming MIDDLE...")
-        self._switch_to_position_controller()
-        time.sleep(0.2)
+        # self._switch_to_position_controller()
+        # time.sleep(0.2)
         self._smooth_move_to_pose(AIM_MIDDLE, duration)
         self.node.get_logger().info("Aiming MIDDLE complete.")
     
