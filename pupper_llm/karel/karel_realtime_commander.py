@@ -181,10 +181,15 @@ class KarelRealtimeCommanderNode(Node):
                 # Final project shoot basketball
                 logger.info("=== Start Shooting Basketball ===")
                 self.pupper.begin_tracking('stop sign')
-    
-                while self.pupper.tracking_enabled:
-                    logger.info("in while loop tracking enabled")
-                    await asyncio.sleep(0.5)
+                with open("tracking_status.txt", "r") as f:
+                    while True:
+                        line = f.readline()
+                        if not line:                                
+                            logger.info("in while loop tracking enabled")
+                            await asyncio.sleep(0.5)  # wait for new data
+                        else:
+                            print("READ:", line.strip())
+                            break
                 
                 logger.info("=== End Shooting Basketball ===")
                 self.pupper.end_tracking()

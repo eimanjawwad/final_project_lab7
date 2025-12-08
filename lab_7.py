@@ -110,6 +110,14 @@ class StateMachineNode(Node):
             self.last_detection_time = self.get_clock().now()
             self.target_width = msg.detections[idx].bbox.size_x
 
+    def stop_tracking(self):
+        self.state = State.IDLE
+        self.tracking_enabled = False     
+        with open("tracking_status.txt", "a") as f:
+            self.get_logger().info("Writing DONE to tracking_status.txt")
+            f.write(f"DONE")
+            f.flush()           # VERY IMPORTANT so the reader sees it
+
     def timer_callback(self):
         """
         Timer callback that manages state transitions and controls robot motion.
@@ -150,8 +158,8 @@ class StateMachineNode(Node):
                 # Center to target horizontally 
                 self.get_logger().info('self.target_pos: '+ str(abs(self.target_pos)) + ', AIM_PRECISION: ' + str(AIM_PRECISION))
                 if abs(self.target_pos) <= AIM_PRECISION:
-                    self.state = State.IDLE
-                    self.tracking_enabled = False              
+                    self.stop_tracking()
+                    self.get_logger().info('🎯 Target centered and within stop width. Stopping tracking')                              
                 else: 
                     # Rotate to center on target horizontally
                     yaw_command = -SEARCH_YAW_VEL if self.last_detection_pos >=0 else SEARCH_YAW_VEL                    

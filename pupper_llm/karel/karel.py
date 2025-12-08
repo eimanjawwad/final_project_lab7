@@ -87,18 +87,10 @@ class KarelPupper:
             subprocess.run([
                 "ros2", "control", "switch_controllers",
                 "--deactivate", "neural_controller",
-                "--activate", "forward_position_controller"
-            ], timeout=5)
-            
-            # Now activate the gain controllers (these can be separate since position is already active)
-            subprocess.run([
-                "ros2", "control", "switch_controllers",
-                "--activate", "forward_kp_controller"
-            ], timeout=5)
-            
-            subprocess.run([
-                "ros2", "control", "switch_controllers",
-                "--activate", "forward_kd_controller"
+                "--activate", 
+                "forward_position_controller",
+                "forward_kp_controller",
+                "forward_kd_controller"
             ], timeout=5)
             
             self.is_aiming_mode = True
@@ -278,7 +270,7 @@ class KarelPupper:
         self.tracking_enabled = True
         self.tracking_object = obj
         msg = String()
-        msg.data = f"start:{obj}"
+        msg.data = f"start:{obj}"   
         self.tracking_control_publisher.publish(msg)
         rclpy.spin_once(self.node, timeout_sec=0.1) 
 
