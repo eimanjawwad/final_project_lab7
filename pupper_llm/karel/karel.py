@@ -216,7 +216,7 @@ class KarelPupper:
         # self._smooth_move_to_pose(AIM_UP, duration)
         # self.node.get_logger().info("Aiming UP complete.")
 
-    def aim_up(self, percent: float = 100.0, duration: float = 1.5):
+    def aim_up(self, percent: float = 100.0, duration: float = 1.5) -> np.ndarray:
         """
         Aim the Pupper's body upward by a given percentage.
         percent=0   -> AIM_MIDDLE pose
@@ -237,13 +237,15 @@ class KarelPupper:
 
         self.node.get_logger().info("Aiming UP complete.")
 
+        return target_pose  # Return the target pose for reference
+
     
-    def aim_middle(self, duration: float = 1.5):
+    def aim_middle(self, duration: float = 1.5, target_pose: np.ndarray = None):
         """
         Aim the Pupper's body to middle/neutral position.
         Switches to position control, moves to AIM_MIDDLE pose.
         """
-        self.current_pose = AIM_UP.copy()
+        self.current_pose = target_pose.copy()
         self.node.get_logger().info("Aiming MIDDLE...")
         self._switch_to_position_controller()
         time.sleep(0.2)
@@ -479,6 +481,7 @@ class KarelPupper:
         move_cmd.angular.z = 0.0
         self.publisher.publish(move_cmd)
         rclpy.spin_once(self.node, timeout_sec=1.0)
+    
     
     def __del__(self):
         self.node.get_logger().info('Tearing down...')
