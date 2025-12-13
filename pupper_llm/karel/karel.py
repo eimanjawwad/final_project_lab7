@@ -18,7 +18,7 @@ import shooting_mech
 
 # Gains for position control (must be set for joints to hold position!)
 # Slightly reduced kp and increased kd for stability (less shaking)
-AIMING_KP = np.array([2.0] * 12)  # Stiffness - lower = less aggressive
+AIMING_KP = np.array([7.5] * 12)  # Stiffness - lower = less aggressive
 AIMING_KD = np.array([0.5] * 12)  # Damping - higher = less oscillation
 
 # Stand

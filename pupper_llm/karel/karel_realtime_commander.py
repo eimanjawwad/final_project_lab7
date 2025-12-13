@@ -198,7 +198,7 @@ class KarelRealtimeCommanderNode(Node):
                 await asyncio.sleep(2.0)
                 
                 logger.info("=== Aiming up ===")
-                target_pose = self.pupper.aim_up(percent=30.0)
+                target_pose = self.pupper.aim_up(percent=80.0)
                 logger.info("Holding up pose for 5 seconds...")
                 await asyncio.sleep(2.0)
 
