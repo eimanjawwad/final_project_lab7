@@ -6,7 +6,7 @@
 
 This repo was forked from our implementation of Lab 7 of CS123. Original lab repo located [here](https://github.com/cs123-stanford/lab_7_fall_2025)
 
-## [Presentation slides, (demo video included)](https://docs.google.com/presentation/d/17IBkJ8fFBrybfbrVzmjYj0ddUGKrWw0dGcLruVsvTPk/edit?usp=sharing)
+## [Presentation slides (demo video included)](https://docs.google.com/presentation/d/17IBkJ8fFBrybfbrVzmjYj0ddUGKrWw0dGcLruVsvTPk/edit?usp=sharing)
 
 ## Added/Modified Files
 * lab_7.py - Object tracking file. Modified to stop and return to Idle state before tracked object and center on it.
