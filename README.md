@@ -17,6 +17,9 @@ This repo was forked from our implementation of Lab 7 of CS123. Original lab rep
 * karel_testing.py - Test file for functions in karel.py
 * shooting_mech.py - Sends high voltage to GPIO pin 26 to fire launcher then low to start up flywheels
 #### Hardware
+* Informed primarily by weight and size constraints, our launcher went through many iterations. We initially thought to strap a Nerf gun to the top of pupper; later we found out a previous group had already implemented this, and the battery-powered guns we were interested in were too cumbersome. Our next step was then to create an original flywheel launcher, designed around Nerf Rival foam balls (~0.875" diameter). You can see our final CAD at: [here](https://cad.onshape.com/documents/c921c09dcc6de268eb584d5f/w/4800d4ed8bfc96cc9374761e/e/c9d1d93adb94f1d6f68957f0?renderMode=0&uiState=693e650e5411e6b191a60ee5).  
+* We wired our launcher (2 motors and a continuous rotation servo) to the Pupper through 2 NMOS-controlled switches for the motors, and an Arduino-driven 1 ms 50Hz pulse for the servo. Time constraints prevented the use of flyback diodes to prevent high voltage loads across the transistors, but they held up quite well for the demo. See the circuit diagram [here]
+
 
 
 ## Testing
